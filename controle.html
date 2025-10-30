@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Controle de Gastos — Simples e Offline</title>
+<style>
+  :root {
+    --bg: #0b1020;        /* fundo escuro elegante */
+    --card: #121932;      /* cartões */
+    --muted: #8ea0c2;     /* texto secundário */
+    --text: #eaf0ff;      /* texto primário */
+    --acc: #7cc5ff;       /* destaque */
+    --danger: #ff6b6b;    /* negativo */
+    --ok: #60d394;        /* positivo */
+    --warn: #ffd166;      /* aviso */
+  }
+  html, body { height: 100%; }
+  body {
+    margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+    color: var(--text); background: radial-gradient(1200px 700px at 70% -10%, #1a2550 0%, var(--bg) 48%), var(--bg);
+  }
+  .wrap { max-width: 1100px; margin: 24px auto 80px; padding: 0 16px; }
+  h1 { font-size: 1.6rem; margin: 0 0 8px; letter-spacing: .2px; }
+  .sub { color: var(--muted); font-size: .95rem; margin-bottom: 16px; }
+  .row { display: grid; grid-template-columns: repeat(12, 1fr); gap: 12px; }
+  .card { background: var(--card); border: 1px solid rgba(255,255,255,.06); border-radius: 16px; padding: 16px; box-shadow: 0 6px 24px rgba(0,0,0,.25); }
+  .badge { display:inline-flex; align-items:center; gap:8px; background: rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.08); padding:6px 10px; border-radius: 99px; color: var(--muted); font-size:.85rem }
+  .grid-6 { grid-column: span 6; }
+  .grid-4 { grid-column: span 4; }
+  .grid-3 { grid-column: span 3; }
+  .grid-8 { grid-column: span 8; }
+  .grid-12 { grid-column: span 12; }
+  @media (max-width: 920px) { .grid-6,.grid-4,.grid-8 { grid-column: span 12; } }
+
+  label { display:block; font-size:.9rem; color: var(--muted); margin-bottom: 6px; }
+  input[type="text"], input[type="number"], select {
+    width: 100%; box-sizing: border-box; border-radius: 12px; border: 1px solid rgba(255,255,255,.12);
+    background: rgba(6,12,32,.6); color: var(--text); padding: 10px 12px; outline: none;
+  }
+  input[type="number"]::-webkit-outer-spin-button, input[type="number"]::-webkit-inner-spin-button{ -webkit-appearance:none; margin:0; }
+  input[type="number"]{ -moz-appearance:textfield; }
+  .btn { display:inline-flex; align-items:center; gap:8px; border:1px solid rgba(255,255,255,.15); background: rgba(255,255,255,.06);
+         color: var(--text); padding:10px 14px; border-radius: 12px; cursor:pointer; user-select:none; }
+  .btn:hover { background: rgba(255,255,255,.12); }
+  .btn.acc { border-color: rgba(124,197,255,.5); box-shadow: inset 0 0 0 1px rgba(124,197,255,.25); }
+  .btn.danger { border-color: rgba(255,107,107,.5); }
+  .btn.warn { border-color: rgba(255,209,102,.5); }
+  .btn.small { padding:6px 10px; font-size:.9rem; }
+  .right { text-align:right; }
+
+  table { width:100%; border-collapse: collapse; }
+  th, td { padding: 10px 8px; border-bottom: 1px dashed rgba(255,255,255,.08); }
+  th { text-align:left; color: var(--muted); font-weight:600; font-size:.9rem; }
+  td.right { text-align:right; }
+  .ghost { color: var(--muted); }
+
+  .kpi { display:grid; grid-template-columns: repeat(4, 1fr); gap:12px; }
+  .kpi .tile { background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.08); padding:14px; border-radius:14px; }
+  .kpi .t { font-size: .85rem; color: var(--muted); }
+  .kpi .v { font-size: 1.25rem; margin-top:6px; font-variant-numeric: tabular-nums; }
+  .pos { color: var(--ok); }
+  .neg { color: var(--danger); }
+
+  .footer { margin-top: 20px; display:flex; gap:10px; flex-wrap:wrap; }
+  .line { height:1px; background: linear-gradient(to right, rgba(255,255,255,.06), rgba(255,255,255,.16), rgba(255,255,255,.06)); margin: 14px 0; }
+
+  .hint { font-size: .88rem; color: var(--muted); }
+  .pill { display:inline-block; padding:3px 8px; border-radius:999px; background: rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.12); font-size:.8rem; color: var(--muted); }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="row">
+      <div class="grid-8">
+        <h1>💸 Controle de Gastos</h1>
+        <div class="sub">Planilha interativa (offline, salva no seu navegador). Preencha os campos, adicione itens e veja automaticamente <strong>quanto pode gastar</strong>, <strong>quanto vai dever</strong> e o <strong>saldo previsto do mês</strong>.</div>
+      </div>
+      <div class="grid-4 right">
+        <span class="badge">Mês: <select id="refMonth"></select></span>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="grid-6 card">
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap: wrap;">
+          <div class="badge">Dados principais</div>
+          <div class="hint">Valores em BRL</div>
+        </div>
+        <div class="line"></div>
+        <div class="row">
+          <div class="grid-6">
+            <label for="saldoInicial">Saldo inicial do mês</label>
+            <input id="saldoInicial" type="number" inputmode="decimal" placeholder="0,00" step="0.01">
+          </div>
+          <div class="grid-6">
+            <label for="dinheiroRecebido">Dinheiro recebido (somatório)</label>
+            <input id="dinheiroRecebido" type="number" inputmode="decimal" placeholder="0,00" step="0.01">
+          </div>
+          <div class="grid-6">
+            <label for="faturaCartao">Cartão de crédito — fatura</label>
+            <input id="faturaCartao" type="number" inputmode="decimal" placeholder="0,00" step="0.01">
+          </div>
+          <div class="grid-6">
+            <label for="faturaInter">Cartão compartilhado — fatura total (Inter)</label>
+            <input id="faturaInter" type="number" inputmode="decimal" placeholder="0,00" step="0.01">
+          </div>
+          <div class="grid-6">
+            <label for="minhaParteInter">Minha parte da fatura compartilhada (%)</label>
+            <input id="minhaParteInter" type="number" min="0" max="100" step="1" value="50">
+          </div>
+          <div class="grid-6">
+            <label for="diasRestantes">Dias restantes no mês (opcional)</label>
+            <input id="diasRestantes" type="number" min="0" step="1" placeholder="auto">
+          </div>
+        </div>
+      </div>
+
+      <div class="grid-6 card">
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap: wrap;">
+          <div class="badge">KPIs do mês</div>
+          <button class="btn small" id="btnRecalc">Recalcular</button>
+        </div>
+        <div class="line"></div>
+        <div class="kpi">
+          <div class="tile">
+            <div class="t">Receitas totais</div>
+            <div class="v" id="kpiReceitas">R$ 0,00</div>
+          </div>
+          <div class="tile">
+            <div class="t">Despesas fixas</div>
+            <div class="v" id="kpiFixas">R$ 0,00</div>
+          </div>
+          <div class="tile">
+            <div class="t">Cartões (incl. Inter)</div>
+            <div class="v" id="kpiCartoes">R$ 0,00</div>
+          </div>
+          <div class="tile">
+            <div class="t">Saldo previsto</div>
+            <div class="v" id="kpiSaldo">R$ 0,00</div>
+          </div>
+        </div>
+        <div class="line"></div>
+        <div class="kpi">
+          <div class="tile">
+            <div class="t">Despesas variáveis planejadas</div>
+            <div class="v" id="kpiVariaveis">R$ 0,00</div>
+          </div>
+          <div class="tile">
+            <div class="t">Pode gastar hoje?*</div>
+            <div class="v" id="kpiPode">—</div>
+          </div>
+          <div class="tile">
+            <div class="t">Orçamento diário restante*</div>
+            <div class="v" id="kpiDiario">—</div>
+          </div>
+          <div class="tile">
+            <div class="t">Minha parte no Inter</div>
+            <div class="v" id="kpiInterPart">R$ 0,00</div>
+          </div>
+        </div>
+        <div class="hint" style="margin-top:8px">*Se você informar os dias restantes, calculamos um teto diário para não estourar o mês.</div>
+      </div>
+    </div>
+
+    <div class="row" style="margin-top:14px;">
+      <div class="grid-6 card">
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap: wrap;">
+          <div class="badge">Contas Fixas</div>
+          <button class="btn small acc" id="addFixa">+ adicionar</button>
+        </div>
+        <div class="line"></div>
+        <table id="tFixas">
+          <thead>
+            <tr><th>Descrição</th><th class="right">Valor</th><th class="right">Ações</th></tr>
+          </thead>
+          <tbody></tbody>
+          <tfoot>
+            <tr><td class="right"><strong>Total</strong></td><td class="right" id="totalFixas">R$ 0,00</td><td></td></tr>
+          </tfoot>
+        </table>
+      </div>
+
+      <div class="grid-6 card">
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap: wrap;">
+          <div class="badge">Despesas Variáveis Planejadas</div>
+          <button class="btn small acc" id="addVar">+ adicionar</button>
+        </div>
+        <div class="line"></div>
+        <table id="tVar">
+          <thead>
+            <tr><th>Descrição</th><th class="right">Valor</th><th class="right">Ações</th></tr>
+          </thead>
+          <tbody></tbody>
+          <tfoot>
+            <tr><td class="right"><strong>Total</strong></td><td class="right" id="totalVar">R$ 0,00</td><td></td></tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+
+    <div class="row" style="margin-top:14px;">
+      <div class="grid-12 card">
+        <div style="display:flex; gap:8px; flex-wrap: wrap; align-items:center; justify-content: space-between;">
+          <div class="badge">Ferramentas</div>
+          <div class="footer">
+            <button class="btn" id="btnSalvar">💾 Salvar</button>
+            <button class="btn warn" id="btnNovoMes" title="Cria mês a partir do atual, zerando os valores variáveis">📅 Novo mês</button>
+            <button class="btn" id="btnExport">⬇️ Exportar (JSON)</button>
+            <label class="btn" for="fileImport">⬆️ Importar (JSON)</label>
+            <input id="fileImport" type="file" accept="application/json" style="display:none" />
+            <button class="btn danger" id="btnZerar">🗑️ Limpar mês</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <p class="hint" style="margin-top:10px">Dica: clique em "+ adicionar" para criar linhas. Os dados ficam salvos por <span class="pill">mês/ano</span> no seu navegador (LocalStorage). Não enviamos nada para a internet.</p>
+  </div>
+
+<script>
+(function(){
+  // ======= Util =======
+  const fmtBRL = (v) => (isNaN(v) ? 0 : v).toLocaleString('pt-BR', { style:'currency', currency:'BRL' });
+  const num = (v) => Number(String(v).replace(',', '.')) || 0;
+  const el = (sel) => document.querySelector(sel);
+  const tbody = (id) => document.querySelector(id + ' tbody');
+  const today = new Date();
+
+  // ======= Estado =======
+  const emptyMonth = () => ({
+    saldoInicial: 0,
+    dinheiroRecebido: 0,
+    faturaCartao: 0,
+    faturaInter: 0,
+    minhaParteInter: 50,
+    diasRestantes: '',
+    fixas: [],
+    variaveis: []
+  });
+
+  const monthsKey = 'cg_ref_months_v1';
+  const dataKey = (ref) => `cg_data_${ref}`; // ref = YYYY-MM
+
+  // ======= Mês de referência =======
+  const refSel = el('#refMonth');
+  function monthListAround() {
+    const opts = [];
+    const base = new Date(today.getFullYear(), today.getMonth(), 1);
+    for (let i = -3; i <= 3; i++) {
+      const d = new Date(base.getFullYear(), base.getMonth() + i, 1);
+      const val = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+      const label = d.toLocaleDateString('pt-BR', { month:'long', year:'numeric' });
+      opts.push({ value: val, label });
+    }
+    return opts;
+  }
+  function renderMonthOptions(){
+    refSel.innerHTML = '';
+    for (const o of monthListAround()){
+      const op = document.createElement('option');
+      op.value = o.value; op.textContent = o.label;
+      refSel.appendChild(op);
+    }
+  }
+
+  function getCurrentRef(){
+    return refSel.value;
+  }
+
+  function ensureMonth(ref){
+    if (!localStorage.getItem(dataKey(ref))){
+      localStorage.setItem(dataKey(ref), JSON.stringify(emptyMonth()));
+    }
+  }
+
+  function loadMonth(ref){
+    const raw = localStorage.getItem(dataKey(ref));
+    return raw ? JSON.parse(raw) : emptyMonth();
+  }
+
+  function saveMonth(ref, obj){
+    localStorage.setItem(dataKey(ref), JSON.stringify(obj));
+  }
+
+  // ======= Tabelas (linhas dinâmicas) =======
+  function addRow(kind, item={ desc:'', valor:0 }){
+    const t = kind === 'fixas' ? '#tFixas' : '#tVar';
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><input type="text" placeholder="Descrição" value="${item.desc || ''}"></td>
+      <td class="right"><input type="number" inputmode="decimal" step="0.01" value="${item.valor || 0}"></td>
+      <td class="right">
+        <button class="btn small danger">remover</button>
+      </td>`;
+    tbody(t).appendChild(tr);
+
+    tr.querySelector('input[type="text"]').addEventListener('input', autoSave);
+    tr.querySelector('input[type="number"]').addEventListener('input', ()=>{ autoSave(); recalc(); });
+    tr.querySelector('.btn.danger').addEventListener('click', ()=>{ tr.remove(); autoSave(); recalc(); });
+  }
+
+  function readTable(kind){
+    const t = kind === 'fixas' ? '#tFixas' : '#tVar';
+    const rows = Array.from(tbody(t).querySelectorAll('tr'));
+    return rows.map(r=>({ desc: r.querySelector('input[type="text"]').value.trim(), valor: num(r.querySelector('input[type="number"]').value) }))
+               .filter(x => x.desc || x.valor);
+  }
+
+  function sum(kind){
+    return readTable(kind).reduce((a,b)=>a + (Number(b.valor)||0), 0);
+  }
+
+  // ======= Inputs principais =======
+  const $ = {
+    saldoInicial: el('#saldoInicial'),
+    dinheiroRecebido: el('#dinheiroRecebido'),
+    faturaCartao: el('#faturaCartao'),
+    faturaInter: el('#faturaInter'),
+    minhaParteInter: el('#minhaParteInter'),
+    diasRestantes: el('#diasRestantes')
+  };
+
+  Object.values($).forEach(inp => inp.addEventListener('input', ()=>{ autoSave(); recalc(); }));
+
+  // ======= KPIs =======
+  const K = {
+    receitas: el('#kpiReceitas'),
+    fixas: el('#kpiFixas'),
+    cartoes: el('#kpiCartoes'),
+    saldo: el('#kpiSaldo'),
+    variaveis: el('#kpiVariaveis'),
+    pode: el('#kpiPode'),
+    diario: el('#kpiDiario'),
+    interPart: el('#kpiInterPart'),
+    totalFixas: el('#totalFixas'),
+    totalVar: el('#totalVar')
+  };
+
+  function recalc(){
+    const receitas = num($.saldoInicial.value) + num($.dinheiroRecebido.value);
+    const fixas = sum('fixas');
+    const variaveis = sum('variaveis');
+    const interPart = num($.faturaInter.value) * ( (num($.minhaParteInter.value)||0)/100 );
+    const cartoes = num($.faturaCartao.value) + interPart;
+    const saldoPrev = receitas - (fixas + variaveis + cartoes);
+
+    K.receitas.textContent = fmtBRL(receitas);
+    K.fixas.textContent = fmtBRL(fixas);
+    K.cartoes.textContent = fmtBRL(cartoes);
+    K.variaveis.textContent = fmtBRL(variaveis);
+    K.saldo.textContent = fmtBRL(saldoPrev);
+    K.interPart.textContent = fmtBRL(interPart);
+
+    K.totalFixas.textContent = fmtBRL(fixas);
+    K.totalVar.textContent = fmtBRL(variaveis);
+
+    const dias = Number($.diasRestantes.value);
+    if (!isNaN(dias) && dias > 0){
+      const diario = saldoPrev / dias;
+      K.diario.textContent = fmtBRL(diario);
+      K.pode.textContent = diario >= 0 ? 'SIM' : 'NÃO';
+      K.pode.className = 'v ' + (diario >= 0 ? 'pos' : 'neg');
+    } else {
+      K.diario.textContent = '—';
+      K.pode.textContent = saldoPrev >= 0 ? 'SIM' : 'NÃO';
+      K.pode.className = 'v ' + (saldoPrev >= 0 ? 'pos' : 'neg');
+    }
+  }
+
+  // ======= Persistência =======
+  function autoSave(){ saveUI(getCurrentRef()); }
+
+  function saveUI(ref){
+    const obj = {
+      saldoInicial: num($.saldoInicial.value),
+      dinheiroRecebido: num($.dinheiroRecebido.value),
+      faturaCartao: num($.faturaCartao.value),
+      faturaInter: num($.faturaInter.value),
+      minhaParteInter: Number($.minhaParteInter.value)||0,
+      diasRestantes: $.diasRestantes.value,
+      fixas: readTable('fixas'),
+      variaveis: readTable('variaveis')
+    };
+    saveMonth(ref, obj);
+  }
+
+  function loadUI(ref){
+    ensureMonth(ref);
+    const obj = loadMonth(ref);
+    $.saldoInicial.value = obj.saldoInicial;
+    $.dinheiroRecebido.value = obj.dinheiroRecebido;
+    $.faturaCartao.value = obj.faturaCartao;
+    $.faturaInter.value = obj.faturaInter;
+    $.minhaParteInter.value = obj.minhaParteInter;
+    $.diasRestantes.value = obj.diasRestantes;
+
+    tbody('#tFixas').innerHTML = '';
+    tbody('#tVar').innerHTML = '';
+    (obj.fixas.length ? obj.fixas : [{},{}]).forEach(x=>addRow('fixas', x));
+    (obj.variaveis.length ? obj.variaveis : [{}]).forEach(x=>addRow('variaveis', x));
+
+    recalc();
+  }
+
+  // ======= Export/Import =======
+  function exportJSON(){
+    const ref = getCurrentRef();
+    const blob = new Blob([ JSON.stringify(loadMonth(ref), null, 2) ], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `controle-gastos-${ref}.json`;
+    a.click();
+  }
+
+  function importJSON(file){
+    const reader = new FileReader();
+    reader.onload = (e)=>{
+      try {
+        const obj = JSON.parse(e.target.result);
+        const ref = getCurrentRef();
+        saveMonth(ref, obj);
+        loadUI(ref);
+      } catch(err){ alert('Arquivo inválido.'); }
+    };
+    reader.readAsText(file);
+  }
+
+  // ======= Novo mês =======
+  function novoMes(){
+    const cur = refSel.value;
+    const d = new Date(Number(cur.slice(0,4)), Number(cur.slice(5))-1, 1);
+    const next = new Date(d.getFullYear(), d.getMonth()+1, 1);
+    const ref = `${next.getFullYear()}-${String(next.getMonth()+1).padStart(2,'0')}`;
+
+    // cria com herança de saldo previsto positivo (opcional)
+    const objAtual = loadMonth(cur);
+    const receitas = objAtual.saldoInicial + objAtual.dinheiroRecebido;
+    const interPart = objAtual.faturaInter * (objAtual.minhaParteInter/100);
+    const gastos = (objAtual.fixas.reduce((a,b)=>a+b.valor,0)) + (objAtual.variaveis.reduce((a,b)=>a+b.valor,0)) + objAtual.faturaCartao + interPart;
+    const saldoPrev = receitas - gastos;
+
+    const novo = emptyMonth();
+    novo.saldoInicial = Math.max(0, Math.round((saldoPrev + Number.EPSILON)*100)/100);
+    novo.minhaParteInter = objAtual.minhaParteInter;
+    // mantém contas fixas
+    novo.fixas = objAtual.fixas;
+
+    saveMonth(ref, novo);
+    // adiciona ao select e seleciona
+    renderMonthOptions();
+    refSel.value = ref;
+    loadUI(ref);
+  }
+
+  // ======= Eventos UI =======
+  el('#addFixa').addEventListener('click', ()=> addRow('fixas'));
+  el('#addVar').addEventListener('click', ()=> addRow('variaveis'));
+  el('#btnSalvar').addEventListener('click', ()=> { autoSave(); alert('Salvo ✅'); });
+  el('#btnRecalc').addEventListener('click', recalc);
+  el('#btnExport').addEventListener('click', exportJSON);
+  el('#fileImport').addEventListener('change', (e)=>{ if (e.target.files[0]) importJSON(e.target.files[0]); e.target.value=''; });
+  el('#btnZerar').addEventListener('click', ()=>{
+    if (confirm('Limpar todos os dados deste mês?')){ saveMonth(getCurrentRef(), emptyMonth()); loadUI(getCurrentRef()); }
+  });
+  el('#btnNovoMes').addEventListener('click', novoMes);
+
+  refSel.addEventListener('change', ()=> loadUI(getCurrentRef()));
+
+  // ======= Boot =======
+  renderMonthOptions();
+  const curRef = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}`
+  refSel.value = curRef;
+  ensureMonth(curRef);
+  loadUI(curRef);
+})();
+</script>
+</body>
+</html>
