@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Controle de Gastos — Simples e Offline</title>
+<title>Controle de Gastos </title>
 <style>
   :root {
     --bg: #0b1020;        /* fundo escuro elegante */
@@ -283,7 +283,7 @@
     localStorage.setItem(dataKey(ref), JSON.stringify(obj));
   }
 
-  // ======= Tabelas (linhas dinâmicas) =======
+  // ======= Tabelas =======
   function addRow(kind, item={ desc:'', valor:0 }){
     const t = kind === 'fixas' ? '#tFixas' : '#tVar';
     const tr = document.createElement('tr');
@@ -433,7 +433,7 @@
     const next = new Date(d.getFullYear(), d.getMonth()+1, 1);
     const ref = `${next.getFullYear()}-${String(next.getMonth()+1).padStart(2,'0')}`;
 
-    // cria com herança de saldo previsto positivo (opcional)
+    // cria com herança de saldo previsto positivo 
     const objAtual = loadMonth(cur);
     const receitas = objAtual.saldoInicial + objAtual.dinheiroRecebido;
     const interPart = objAtual.faturaInter * (objAtual.minhaParteInter/100);
